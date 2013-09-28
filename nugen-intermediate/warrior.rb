@@ -1,7 +1,5 @@
 require 'delegate'
 
-# DIRECTIONS.each {|d| adjacent_cells[d] = :enemy if feel(d).enemy?}
-
 class Warrior < SimpleDelegator
 
 	DIRECTIONS = [:forward, :backward, :left, :right]
@@ -28,7 +26,8 @@ class Warrior < SimpleDelegator
 		if @nearby_enemies > 1
 			bind_enemies
 		elsif (@nearby_enemies == 0) && (feel_for_captives.count > 0)
-			free_captives unless retreat_and_heal
+			# free_captives unless retreat_and_heal
+			find_captives
 		elsif @captives.count > 0
 			find_captives
 		else
@@ -37,13 +36,18 @@ class Warrior < SimpleDelegator
 	end
 
 	def find_captives
-		if !feel(direction_of(@captives.first)).stairs? && feel(direction_of(@captives.first)).empty?
-			walk!(direction_of(@captives.first))
-		elsif feel(direction_of(@captives.first)).enemy?
-			attack!(direction_of(@captives.first))
+		@target_captive = @captives.select {|captive| captive if captive.ticking?}.first
+		@target_captive = @captives.first if @target_captive.nil?
+		puts @target_captive.inspect
+
+		if !feel(direction_of(@target_captive)).stairs? && feel(direction_of(@target_captive)).empty?
+			walk!(direction_of(@target_captive))
+		elsif feel(direction_of(@target_captive)).enemy?
+			attack!(direction_of(@target_captive))
+		elsif feel(direction_of(@target_captive)).to_s == "Captive"
+			rescue!(direction_of(@target_captive))
 		else
-			path_options = DIRECTIONS.select { |d| d if d != direction_of(@captives.first)  }
-			puts path_options.inspect
+			path_options = DIRECTIONS.select { |d| d if d != direction_of(@target_captive)  }
 			path_options.each {|d| return walk!(d) if feel(d).empty? }
 		end
 	end
