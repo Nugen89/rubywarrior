@@ -9,12 +9,14 @@ class Player
   end
 
   def play_turn(warrior)
-  	@warrior = Warrior.new(warrior)
+  	@warrior = Warrior.new(warrior, @turns_made)
   	@warrior.prev_health = @prev_health
 
+  	# puts @warrior.look.inspect
 		@warrior.determine_action
 
   	set_previous_health(@warrior)
+  	end_of_turn
   end
 
   private
