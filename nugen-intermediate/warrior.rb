@@ -12,21 +12,44 @@ class Warrior < SimpleDelegator
 		super(warrior)
 		@adjacent_cells = feel_for_enemies
 		@nearby_enemies = feel_for_enemies.count
+		@captives = listen_for_captives
 	end
 
 	def determine_action
 
+		puts @captives.inspect
+
+		puts "#{listen}"
 		puts "ESCAPE: #{escape_paths.inspect}"
 		puts "ADJACENT: #{@adjacent_cells}"
 		puts "CAPTIVES: #{feel_for_captives}"
+		puts "---------------------------"
 
 		if @nearby_enemies > 1
 			bind_enemies
 		elsif (@nearby_enemies == 0) && (feel_for_captives.count > 0)
 			free_captives unless retreat_and_heal
+		elsif @captives.count > 0
+			find_captives
 		else
 			advance_and_attack unless retreat_and_heal
 		end
+	end
+
+	def find_captives
+		if !feel(direction_of(@captives.first)).stairs? && feel(direction_of(@captives.first)).empty?
+			walk!(direction_of(@captives.first))
+		elsif feel(direction_of(@captives.first)).enemy?
+			attack!(direction_of(@captives.first))
+		else
+			path_options = DIRECTIONS.select { |d| d if d != direction_of(@captives.first)  }
+			puts path_options.inspect
+			path_options.each {|d| return walk!(d) if feel(d).empty? }
+		end
+	end
+
+	def listen_for_captives
+		listen.select { |target| target if target.to_s == "Captive" }
 	end
 
 	def bind_enemies
@@ -35,13 +58,6 @@ class Warrior < SimpleDelegator
 				bind!(direction)
 				@adjacent_cells[direction] = :bounded
 				return
-			else				
-				# if feel(direction_of_stairs).enemy?
-				# 	attack!(direction_of_stairs)
-				# else
-				# 	walk!(direction_of_stairs)
-				# end
-				# return
 			end
 		end
 	end
