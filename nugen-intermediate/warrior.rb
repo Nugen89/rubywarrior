@@ -20,31 +20,44 @@ class Warrior < SimpleDelegator
 
 	def determine_action
 
-		puts "#{listen}"
+		puts "----------------------------"
+		puts "Nearby enemies: #{@nearby_enemies}"
 		puts "ESCAPE: #{escape_paths.inspect}"
 		puts "ADJACENT: #{@adjacent_cells}"
 		puts "CAPTIVES: #{feel_for_captives}"
 		puts "---------------------------"
 
 		if @nearby_enemies > 1
+			puts "--Binding"
 			bind_enemies
 		elsif enemies_in_a_row
-			detonate! unless retreat_and_heal
-		elsif (@nearby_enemies == 0) && (feel_for_captives.count > 0)
-			free_captives 
-			# unless retreat_and_heal
+			puts "--Detonate"
+			if safe_to_detonate
+				detonate! unless retreat_and_heal
+			else
+				retreat_and_heal
+			end
+		# elsif (@nearby_enemies == 0) && (feel_for_captives.count > 0)
+		# 	puts "--Free_captives"
+		# 	free_captives # unless retreat_and_heal
 		elsif @captives.count > 0
-			find_captives
+			puts "--find_captives"
+			find_captives unless retreat_and_heal
 		else
+			puts "--advance and attack"
 			advance_and_attack unless retreat_and_heal
 		end
 
 	end
 
+	def safe_to_detonate
+		@captives.select {|captive| return captive if distance_of(captive) < 3}.empty?
+	end
+
 	def find_captives
 		if !feel(direction_of(@target_captive)).stairs? && feel(direction_of(@target_captive)).empty?
 			walk!(direction_of(@target_captive))
-		elsif feel(direction_of(@target_captive)).to_s != "Captive"
+		elsif (feel(direction_of(@target_captive)).to_s != "Captive") && (!feel(direction_of(@target_captive)).stairs?)
 			attack!(direction_of(@target_captive))
 		elsif feel(direction_of(@target_captive)).to_s == "Captive"
 			rescue!(direction_of(@target_captive))
@@ -108,7 +121,7 @@ class Warrior < SimpleDelegator
 		end
 
 		def enemies_in_a_row
-			look[0].enemy? && look[1].enemy?
+			(look[0].enemy? && look[1].enemy?) || (look[1].enemy? && look[2].enemy?)
 		end
 
 		def advance_and_attack
@@ -120,11 +133,15 @@ class Warrior < SimpleDelegator
 		end
 
 		def retreat_and_heal
-			if (health <= LOW_HEALTH) && taking_damage? && (escape_paths.count > 0)
+			puts "--RETREAT and HEAL"
+			if (health <= LOW_HEALTH) && taking_damage? && (@nearby_enemies > 0) && (escape_paths.count > 0)
 				walk!(escape_paths.first)
-			elsif health < MAX_HEALTH-1 && !taking_damage? && (@nearby_enemies == 0)
+			elsif health < MAX_HEALTH-7 && !taking_damage? # && (@nearby_enemies == 0)
+				rest!
+			elsif health < MAX_HEALTH-7 && taking_damage? && (@nearby_enemies == 0)
 				rest!
 			else
+				puts "--Retreat and heal Failed"
 				false
 			end
 		end
