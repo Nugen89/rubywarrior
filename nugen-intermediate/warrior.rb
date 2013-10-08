@@ -5,7 +5,17 @@ class Warrior < SimpleDelegator
 	DIRECTIONS = [:forward, :backward, :left, :right]
 	MAX_HEALTH = 20
 	LOW_HEALTH = 8
-
+	
+	def debug_info
+		puts "----------------------------"
+		puts "Nearby enemies: #{@nearby_enemies}"
+		puts "ESCAPE: #{escape_paths.inspect}"
+		puts "ADJACENT: #{@adjacent_cells}"
+		puts "CAPTIVES: #{@captives}"
+		puts "TICKING CAPTIVES: #{ticking_captives?}"
+		puts "---------------------------"
+	end
+	
 	def initialize(warrior, turn)
 		super(warrior)
 		@adjacent_cells = feel_for_enemies
@@ -15,17 +25,10 @@ class Warrior < SimpleDelegator
 
 		@target_captive = @captives.select {|captive| captive if captive.ticking?}.first
 		@target_captive = @captives.first if @target_captive.nil?
-		puts @target_captive.inspect
 	end
 
 	def determine_action
-
-		puts "----------------------------"
-		puts "Nearby enemies: #{@nearby_enemies}"
-		puts "ESCAPE: #{escape_paths.inspect}"
-		puts "ADJACENT: #{@adjacent_cells}"
-		puts "CAPTIVES: #{feel_for_captives}"
-		puts "---------------------------"
+		debug_info
 
 		if @nearby_enemies > 1
 			puts "--Binding"
@@ -35,7 +38,7 @@ class Warrior < SimpleDelegator
 			if safe_to_detonate
 				detonate! unless retreat_and_heal
 			else
-				retreat_and_heal
+				advance_and_attack unless retreat_and_heal
 			end
 		# elsif (@nearby_enemies == 0) && (feel_for_captives.count > 0)
 		# 	puts "--Free_captives"
@@ -47,11 +50,6 @@ class Warrior < SimpleDelegator
 			puts "--advance and attack"
 			advance_and_attack unless retreat_and_heal
 		end
-
-	end
-
-	def safe_to_detonate
-		@captives.select {|captive| return captive if distance_of(captive) < 3}.empty?
 	end
 
 	def find_captives
@@ -65,10 +63,6 @@ class Warrior < SimpleDelegator
 			path_options = DIRECTIONS.select { |d| d if d != direction_of(@target_captive)  }
 			path_options.each {|d| return walk!(d) if feel(d).empty? }
 		end
-	end
-
-	def listen_for_captives
-		listen.select { |target| target if target.to_s == "Captive" }
 	end
 
 	def bind_enemies
@@ -98,12 +92,21 @@ class Warrior < SimpleDelegator
 		@prev_health = value
 	end
 
+
 	private
 
 		def escape_paths
 			DIRECTIONS.inject([]) {|paths, d| paths << d if feel(d).empty?; paths }
 		end
 
+		def listen_for_captives
+			listen.select { |target| target if target.to_s == "Captive" }
+		end
+	
+		def safe_to_detonate
+			@captives.select {|captive| return captive if distance_of(captive) < 3}.empty?
+		end
+	
 		def feel_for_enemies
 			DIRECTIONS.inject({}) {|hash, d| hash[d] = :enemy if feel(d).enemy?; hash} 
 		end
@@ -121,7 +124,8 @@ class Warrior < SimpleDelegator
 		end
 
 		def enemies_in_a_row
-			(look[0].enemy? && look[1].enemy?) || (look[1].enemy? && look[2].enemy?)
+			# Ugly map hack
+			(look[0].enemy? && look[1].enemy?) || ( (look[1].enemy? && look[2].enemy?) && (feel(:left).to_s == "Sludge") )
 		end
 
 		def advance_and_attack
@@ -134,16 +138,26 @@ class Warrior < SimpleDelegator
 
 		def retreat_and_heal
 			puts "--RETREAT and HEAL"
-			if (health <= LOW_HEALTH) && taking_damage? && (@nearby_enemies > 0) && (escape_paths.count > 0)
+			if (health <= LOW_HEALTH) && taking_damage? && (@nearby_enemies > 0) && (escape_paths.count > 0) && !ticking_captives?
 				walk!(escape_paths.first)
-			elsif health < MAX_HEALTH-7 && !taking_damage? # && (@nearby_enemies == 0)
+			elsif health < MAX_HEALTH-7 && !taking_damage? && !ticking_captives?
 				rest!
-			elsif health < MAX_HEALTH-7 && taking_damage? && (@nearby_enemies == 0)
+			elsif health < MAX_HEALTH-7 && taking_damage? && (@nearby_enemies == 0) && !ticking_captives?
+				rest!
+			elsif health < 4
 				rest!
 			else
 				puts "--Retreat and heal Failed"
 				false
 			end
+		end
+		
+		def ticking_captives?
+			if !@captives.empty?
+				@captives.each {|c| return true if c.ticking? }
+			else
+				false
+			end			
 		end
 
 end
